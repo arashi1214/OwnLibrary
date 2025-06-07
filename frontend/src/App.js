@@ -1,16 +1,30 @@
+import '@fontsource/roboto/300.css';
+import '@fontsource/roboto/400.css';
+import '@fontsource/roboto/500.css';
+import '@fontsource/roboto/700.css';
+
+
+
+import { BrowserRouter, Route, Routes} from "react-router-dom"
+
 import './App.css';
+import Bookpage from "./BookList/Bookpage";
 import Title from './Components/Title';
-import BookForm from './BookList/BookForm';
-import Result from './Components/Result';
+import AddBook from "./BookCRUD/AddBook";
+
 
 function App() {
   return (
-    <div className="App">
-      <Title></Title>
-      <BookForm></BookForm>
-      <Result></Result>
-    </div>
+    <BrowserRouter>
+      <Title />
+      <Routes>
+        <Route path="/" element={<Bookpage />} />
+        <Route path="/list"/>
+        <Route path="/addBook" element={<AddBook />}/>
+      </Routes>
+    </BrowserRouter>
   );
 }
 
 export default App;
+

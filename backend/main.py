@@ -1,76 +1,72 @@
-from fastapi import FastAPI
-from enum import Enum
-from typing import Optional
+from fastapi import FastAPI, Depends, HTTPException
+from sqlalchemy.orm import Session
 
-#SQL
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
-from sqlalchemy import create_engine, Column, Integer, String, Numeric, ForeignKey, Text, TIMESTAMP, func
+from database import engine, SessionLocal
+import models
+import Schema
 
-# 資料型態驗證
-from pydantic import BaseModel
-
-# 連接資料庫
-DATABASE_URL = "postgresql://user:adminrd@localhost:5432/OwnLibrary"
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(bind=engine)
-Base = declarative_base()
-
-# Models
-class Book(Base):
-    __tablename__ = "books"
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
-    title = Column(String, nullable=False)
-    author = Column(String)
-    isbn = Column(String, unique=True)
-    category = Column(String)
-    price = Column(Numeric(10, 2))
-    created_at = Column(TIMESTAMP, server_default=func.now())
-
-class User(Base):
-    __tablename__ = "users"
-
-    id = Column(Integer, primary_key=True, index=True)
-    username = Column(String, unique=True, nullable=False)
-    password = Column(String, nullable=False)
-    created_at = Column(TIMESTAMP, server_default=func.now())
-
-
-
-# 定義預設值
-# class BlogType(str, Enum):
-#     business = "business"
-#     story = "story"
-#     qa = "qa"
-# Schemas
-
-class BookBase(BaseModel):
-    title: str
-    author: Optional[str] = None #選填，字串，預設 None
-    isbn: Optional[str] = None
-    category: Optional[str] = None
-    price: Optional[float] = None
-    user_id: int
-
-class BookCreate(BookBase):
-    pass
-
-class BookOut(BookBase):
-    id: int
-    created_at: Optional[str]
-
-    class Config:
-        orm_mode = True
-
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+# 建立 models 內的資料表
+models.Base.metadata.create_all(bind=engine)
 
+# 建立那些 url 可以呼叫到此 API
+origins = [
+    "http://localhost",
+    "http://localhost:3000",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 @app.get("/")
 def read_root():
-    return {"Hello": "FastAPI"}
+    return {"message": "Hello, this in index page"}
+
+articles = []
+
+# 列出全部的清單
+@app.get("/books")
+def find_book(db: Session = Depends(get_db)):
+    result = db.query(models.Book).all()
+    print(result)
+    return {"message": result}
+
+@app.get("/get_book_detail/{book_title}")
+def get_books(book_title:str, db: Session = Depends(get_db)):
+    result = db.query(models.Book).filter(models.Book.title == book_title)
+
+    if not result:
+        raise HTTPException(status_code=404, detail='This id\'s question is not found...')
+
+    return result
+
+# 新增書籍
+@app.post("/create_book")
+def create_book(book: Schema.BookCreate, db: Session = Depends(get_db)):
+    new_book = models.Book(**book.dict())
+    new_book.user_id = 1
+
+    db.add(new_book)
+    db.commit()
+    db.refresh(new_book)
+
+    return new_book
+
+'''
 
 @app.get("/blog/all")
 def get_blog(page=0, size=0):
@@ -93,3 +89,4 @@ def get_blog(id: int):
 @app.get("/blog/type/{type}")
 def get_blog_type(type: BlogType):
     return {"message":f"Blog 的資料型態是 {type}"}
+'''
